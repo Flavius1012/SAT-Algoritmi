@@ -1,5 +1,3 @@
-# Davis-Putnam SAT Solver în Python (format DIMACS)
-
 def parse_dimacs(dimacs_str):
     clauses = []
     for line in dimacs_str.splitlines():
@@ -63,8 +61,6 @@ def davis_putnam(clauses):
     new_clauses = clauses + [{-l}]
     return davis_putnam(new_clauses)
 
-
-# Exemplu utilizare
 if __name__ == "__main__":
     print("Introduceți formula în format DIMACS (finalizați input-ul cu o linie goală):")
     dimacs_input = ""
