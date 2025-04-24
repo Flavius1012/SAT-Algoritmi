@@ -1,52 +1,83 @@
-from typing import List
+# Davis-Putnam SAT Solver în Python (format DIMACS)
 
-def parse_clause(line: str) -> frozenset:
-    literals = list(map(int, line.strip().split()))
-    return frozenset(lit for lit in literals if lit != 0)
-
-def eliminate_var(var, clauses):
-    new_clauses = []
-    for clause in clauses:
-        if var in clause:
-            continue
-        if -var in clause:
-            new_clause = clause - {-var}
-            if not new_clause:
-                return None
-            new_clauses.append(new_clause)
-        else:
-            new_clauses.append(clause)
-    return new_clauses
-
-def dp_algorithm(clauses):
-    variables = set(abs(lit) for clause in clauses for lit in clause)
-    while variables:
-        var = variables.pop()
-        clauses_pos = eliminate_var(var, clauses)
-        if clauses_pos is None:
-            return "Formula este NESATISFIABILA (contradicție prin eliminare pozitivă)."
-        clauses_neg = eliminate_var(-var, clauses)
-        if clauses_neg is None:
-            return "Formula este NESATISFIABILA (contradicție prin eliminare negativă)."
-        clauses = list({frozenset(c) for c in clauses_pos + clauses_neg})
-    return "Formula este SATISFIABILA (nu s-a generat contradicție)."
-
-def main():
-    print("Introdu clauze în formatul: 1 -2 0 (0 marchează sfârșitul clauzei).")
-    print("Apasă ENTER fără nimic pentru a termina introducerea.\n")
-
+def parse_dimacs(dimacs_str):
     clauses = []
-    while True:
-        line = input("Clauză: ").strip()
-        if not line:
-            break
-        clause = parse_clause(line)
-        if clause:
-            clauses.append(clause)
+    for line in dimacs_str.splitlines():
+        line = line.strip()
+        if line.startswith('c') or line.startswith('p') or not line:
+            continue
+        literals = list(map(int, line.split()))
+        clause = set(literals[:-1])  # elimină 0-ul de la final
+        clauses.append(clause)
+    return clauses
 
-    result = dp_algorithm(clauses)
-    print("\nRezultat:")
-    print(result)
 
+def unit_propagation(clauses):
+    assignment = set()
+    unit_clauses = [c for c in clauses if len(c) == 1]
+    while unit_clauses:
+        unit = next(iter(unit_clauses[0]))
+        assignment.add(unit)
+        clauses = [c for c in clauses if unit not in c]
+        clauses = [c - {-unit} for c in clauses]
+        if any(len(c) == 0 for c in clauses):
+            return clauses, assignment, False
+        unit_clauses = [c for c in clauses if len(c) == 1]
+    return clauses, assignment, True
+
+
+def pure_literal_elimination(clauses):
+    assignment = set()
+    literals = {lit for clause in clauses for lit in clause}
+    pure_literals = set()
+    for l in literals:
+        if -l not in literals:
+            pure_literals.add(l)
+    while pure_literals:
+        lit = pure_literals.pop()
+        assignment.add(lit)
+        clauses = [c for c in clauses if lit not in c]
+        literals = {lit for clause in clauses for lit in clause}
+        pure_literals = {l for l in literals if -l not in literals}
+    return clauses, assignment
+
+
+def davis_putnam(clauses):
+    clauses, unit_assignment, success = unit_propagation(clauses)
+    if not success:
+        return False
+
+    clauses, pure_assignment = pure_literal_elimination(clauses)
+
+    if not clauses:
+        return True
+    if any(len(c) == 0 for c in clauses):
+        return False
+
+    l = next(iter(next(iter(clauses))))
+
+    new_clauses = clauses + [{l}]
+    if davis_putnam(new_clauses):
+        return True
+
+    new_clauses = clauses + [{-l}]
+    return davis_putnam(new_clauses)
+
+
+# Exemplu utilizare
 if __name__ == "__main__":
-    main()
+    print("Introduceți formula în format DIMACS (finalizați input-ul cu o linie goală):")
+    dimacs_input = ""
+    while True:
+        line = input()
+        if line.strip() == "":
+            break
+        dimacs_input += line + "\n"
+
+    clauses = parse_dimacs(dimacs_input)
+    result = davis_putnam(clauses)
+
+    if result:
+        print("Formula este SATISFIABILĂ")
+    else:
+        print("Formula NU este satisfiabilă")
